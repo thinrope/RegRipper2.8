@@ -3,6 +3,7 @@
 # Parse the SAM hive file for user/group membership info
 #
 # Change history:
+#    20150914 - fixed i18n issue (by Kalin KOZHUHAROV)
 #    20120722 - updated %config hash
 #    20110303 - Fixed parsing of SID, added check for account type
 #               Acct type determined based on Dustin Hulburt's "Forensic
@@ -22,6 +23,7 @@
 #-----------------------------------------------------------
 package samparse;
 use strict;
+use Encode;
 
 my %config = (hive          => "SAM",
               hivemask      => 2,
@@ -31,7 +33,7 @@ my %config = (hive          => "SAM",
               hasShortDescr => 1,
               hasDescr      => 0,
               hasRefs       => 1,
-              version       => 20120722);
+              version       => 20150914);
 
 sub getConfig{return %config}
 
@@ -225,9 +227,11 @@ sub parseV {
 	my $header = substr($v,0,44);
 	my @vals = unpack("V*",$header);   
 	$v_val{type}     = $types{$vals[1]}; 
-	$v_val{name}     = _uniToAscii(substr($v,($vals[3] + 0xCC),$vals[4]));
-	$v_val{fullname} = _uniToAscii(substr($v,($vals[6] + 0xCC),$vals[7])) if ($vals[7] > 0);
-	$v_val{comment}  = _uniToAscii(substr($v,($vals[9] + 0xCC),$vals[10])) if ($vals[10] > 0);
+	$v_val{name}     = decode('utf16le', substr($v,($vals[3] + 0xCC),$vals[4]));
+	$v_val{fullname} = decode('utf16le', substr($v,($vals[6] + 0xCC),$vals[7]))
+		if ($vals[7] > 0);
+	$v_val{comment}  = decode('utf16le', substr($v,($vals[9] + 0xCC),$vals[10]))
+		if ($vals[10] > 0);
 	return %v_val;
 }
 
@@ -237,8 +241,8 @@ sub parseC {
 	my $header = substr($cv,0,0x34);
 	my @vals = unpack("V*",$header);
 	
-	$c_val{group_name} = _uniToAscii(substr($cv,(0x34 + $vals[4]),$vals[5]));
-	$c_val{comment}    = _uniToAscii(substr($cv,(0x34 + $vals[7]),$vals[8]));
+	$c_val{group_name} = decode('utf16le', substr($cv,(0x34 + $vals[4]),$vals[5]));
+	$c_val{comment}    = decode('utf16le', substr($cv,(0x34 + $vals[7]),$vals[8]));
 	$c_val{num_users}  = $vals[12];
 
 	return %c_val;
@@ -316,15 +320,6 @@ sub _translateSID {
 	else {
 # Nothing to do		
 	}
-}
-
-#---------------------------------------------------------------------
-# _uniToAscii()
-#---------------------------------------------------------------------
-sub _uniToAscii {
-  my $str = $_[0];
-  $str =~ s/\00//g;
-  return $str;
 }
 
 1;
